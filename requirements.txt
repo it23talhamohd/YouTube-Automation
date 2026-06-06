@@ -1,0 +1,10 @@
+google-generativeai
+gspread
+google-auth
+pyyaml
+requests
+feedparser
+edge-tts
+playwright
+beautifulsoup4
+imageio-ffmpeg

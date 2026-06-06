@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Secrets and Session Cookies (CRITICAL)
+config/settings.yaml
+config/browser_state.json
+
+# Local scheduler state
+config/scheduler_state.json
+
+# Logs
+logs/
+*.log
+
+# Temporary assets, downloads, and rendered videos
+assets/temp/
+assets/stock_cache/
+assets/output/
+channel_videos.txt
+row_structure.html
+dialog.html
+
+# OS-specific files
+.DS_Store
+Thumbs.db
