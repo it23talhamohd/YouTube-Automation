@@ -239,26 +239,68 @@ else:
                     # Action Button
                     btn_key = f"pub_{topic_slug}"
                     if st.button("🚀 Publish to YouTube Shorts", key=btn_key, use_container_width=True):
-                        with st.spinner("Publishing video via official API..."):
-                            video_file = local_path if os.path.exists(local_path) else drive_link
+                        with st.spinner("Preparing and uploading video..."):
+                            video_file = local_path
+                            temp_downloaded = False
                             
-                            description = f"{yt_title}\n\nAutomated Shorts daily update.\n\n#shorts #news #viral"
-                            
-                            video_id = uploader.upload_shorts_video(
-                                video_path=video_file,
-                                title=yt_title,
-                                description=description,
-                                privacy_status="public"
-                            )
-                            
-                            if video_id:
-                                # Update database status
-                                db.update_row_status(title, "UPLOADED", {"YT Upload Status": "SUCCESS"})
-                                st.success(f"Successfully uploaded! Watch link: https://youtube.com/shorts/{video_id}")
-                                st.rerun()
+                            # If not found locally (which is true in Streamlit Cloud), download from GDrive
+                            if not os.path.exists(video_file) and drive_link:
+                                import re
+                                # Extract file ID from Google Drive URL
+                                file_id = None
+                                match = re.search(r'/d/([a-zA-Z0-9_-]+)', drive_link)
+                                if match:
+                                    file_id = match.group(1)
+                                else:
+                                    match = re.search(r'id=([a-zA-Z0-9_-]+)', drive_link)
+                                    if match:
+                                        file_id = match.group(1)
+                                        
+                                if file_id:
+                                    st.info("Downloading video from Google Drive...")
+                                    from src.gdrive import base_manager as gdrive
+                                    os.makedirs("assets/temp", exist_ok=True)
+                                    temp_dest = os.path.join("assets", "temp", f"temp_{topic_slug}.mp4")
+                                    if gdrive.download_file(file_id, temp_dest):
+                                        video_file = temp_dest
+                                        temp_downloaded = True
+                                    else:
+                                        st.error("Could not download video from Google Drive.")
+                                else:
+                                    st.error("Invalid Google Drive video link format.")
+                                    
+                            if os.path.exists(video_file):
+                                description = f"{yt_title}\n\nAutomated Shorts daily update.\n\n#shorts #news #viral"
+                                
+                                video_id = uploader.upload_shorts_video(
+                                    video_path=video_file,
+                                    title=yt_title,
+                                    description=description,
+                                    privacy_status="public"
+                                )
+                                
+                                if video_id:
+                                    # Update database status
+                                    db.update_row_status(title, "UPLOADED", {"YT Upload Status": "SUCCESS"})
+                                    st.success(f"Successfully uploaded! Watch link: https://youtube.com/shorts/{video_id}")
+                                    # Clean up temp file
+                                    if temp_downloaded and os.path.exists(video_file):
+                                        try:
+                                            os.remove(video_file)
+                                        except Exception:
+                                            pass
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to publish video. Check application execution logs.")
+                                    # Clean up temp file
+                                    if temp_downloaded and os.path.exists(video_file):
+                                        try:
+                                            os.remove(video_file)
+                                        except Exception:
+                                            pass
                             else:
-                                st.error("Failed to publish video. Check application execution logs.")
-                st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 20px 0;'>", unsafe_allow_html=True)
+                                st.error("Video file does not exist. Cannot upload.")
+                    st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 20px 0;'>", unsafe_allow_html=True)
 
     # TAB 2: DRAFTS
     with tab_drafts:

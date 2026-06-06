@@ -114,5 +114,31 @@ class GDriveManager:
             logger.error(f"Failed to upload '{file_name}' to Google Drive: {e}")
             # Fallback to local path
             return local_path
+
+    def download_file(self, file_id, local_dest_path):
+        """Downloads a file from Google Drive using its file ID."""
+        if self.use_fallback or not self.client:
+            logger.error("Drive client not initialized. Cannot download.")
+            return False
+        try:
+            from googleapiclient.http import MediaIoBaseDownload
+            import io
+            
+            logger.info(f"Downloading file ID: {file_id} from Google Drive...")
+            request = self.client.files().get_media(fileId=file_id)
+            fh = io.FileIO(local_dest_path, 'wb')
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+                if status:
+                    logger.info(f"Download progress: {int(status.progress() * 100)}%")
+            fh.close()
+            logger.info(f"Successfully downloaded file to: {local_dest_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to download file {file_id} from Google Drive: {e}")
+            return False
+
 base_manager = GDriveManager()
 
