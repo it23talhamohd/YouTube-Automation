@@ -339,19 +339,43 @@ class Orchestrator:
         temp_path = os.path.join(TEMP_DIR, f"final_{topic_slug}.mp4")
         
         video_to_upload = None
+        temp_downloaded = False
+        
         if os.path.exists(temp_path):
             video_to_upload = temp_path
-        elif os.path.exists(local_video_path):
+        elif local_video_path and os.path.exists(local_video_path):
             video_to_upload = local_video_path
+        elif local_video_path and (local_video_path.startswith("http://") or local_video_path.startswith("https://")):
+            # If it's a URL (Google Drive link), download it locally first
+            import re
+            file_id = None
+            match = re.search(r'/d/([a-zA-Z0-9_-]+)', local_video_path)
+            if match:
+                file_id = match.group(1)
+            else:
+                match = re.search(r'id=([a-zA-Z0-9_-]+)', local_video_path)
+                if match:
+                    file_id = match.group(1)
+                    
+            if file_id:
+                logger.info(f"Video file is a Google Drive link. Downloading ID {file_id} to runner...")
+                temp_dest = os.path.join(TEMP_DIR, f"temp_download_{topic_slug}.mp4")
+                if gdrive.download_file(file_id, temp_dest):
+                    video_to_upload = temp_dest
+                    temp_downloaded = True
+                else:
+                    logger.error(f"Failed to download video from Google Drive for topic: {title}")
+            else:
+                logger.error(f"Invalid Google Drive video URL format: {local_video_path}")
             
-        if not video_to_upload:
+        if not video_to_upload or not os.path.exists(video_to_upload):
             logger.error(f"Video file not found locally to upload: {local_video_path}")
             self.db.update_row_status(title, "FAILED", {"Error Logs": "Video output file missing for upload."})
             return
             
         description = f"{yt_title}\n\nAutomated Shorts daily update.\n\n#shorts #news #viral"
         
-        # Trigger Playwright uploader
+        # Trigger YouTube API uploader
         logger.info(f"Publishing YouTube Short for: '{title}'...")
         upload_success = self.uploader.upload_shorts_video(video_to_upload, yt_title, description)
         
@@ -363,18 +387,26 @@ class Orchestrator:
             # Send confirmation alerts
             base_notifier.notify_upload_success(title)
             
-            # Delete local render temp file after successful upload
+            # Delete local render temp file and downloaded temp file after successful upload
             try:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
+                if temp_downloaded and os.path.exists(video_to_upload):
+                    os.remove(video_to_upload)
             except Exception:
                 pass
         else:
             logger.error(f"Failed to upload '{title}' to YouTube.")
             self.db.update_row_status(title, "FAILED", {
                 "YT Upload Status": "FAILED",
-                "Error Logs": "Browser upload script failed."
+                "Error Logs": "Official API upload script failed."
             })
+            # Clean up downloaded temp file even on failure
+            try:
+                if temp_downloaded and os.path.exists(video_to_upload):
+                    os.remove(video_to_upload)
+            except Exception:
+                pass
 
 def main():
     parser = argparse.ArgumentParser(description="AI News Shorts Automation Agent")
