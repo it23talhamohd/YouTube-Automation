@@ -13,6 +13,8 @@ ENV/
 # Secrets and Session Cookies (CRITICAL)
 config/settings.yaml
 config/browser_state.json
+config/credentials.json
+config/token.json
 
 # Local scheduler state
 config/scheduler_state.json

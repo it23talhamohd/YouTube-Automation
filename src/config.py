@@ -21,6 +21,12 @@ class Config:
                 self.data = {}
 
     def get(self, key, default=None):
+        # 1. Check if an environment variable override exists (e.g., 'nvidia.api_key' -> 'NVIDIA_API_KEY')
+        env_key = key.replace('.', '_').upper()
+        if env_key in os.environ:
+            return os.environ[env_key]
+            
+        # 2. Fallback to settings.yaml file data
         keys = key.split('.')
         val = self.data
         for k in keys:

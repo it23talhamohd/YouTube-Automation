@@ -7,7 +7,6 @@ logger = logging.getLogger("AutomationAgent.Drive")
 try:
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
-    from google.oauth2.service_account import Credentials
     GOOGLE_DRIVE_AVAILABLE = True
 except ImportError:
     GOOGLE_DRIVE_AVAILABLE = False
@@ -15,7 +14,6 @@ except ImportError:
 
 class GDriveManager:
     def __init__(self):
-        self.creds_path = os.path.join(BASE_DIR, "config", "google_credentials.json")
         self.folder_id = config.get("google.drive_folder_id")
         self.client = None
         self.use_fallback = True
@@ -23,17 +21,51 @@ class GDriveManager:
         self._initialize_drive()
 
     def _initialize_drive(self):
-        if GOOGLE_DRIVE_AVAILABLE and os.path.exists(self.creds_path) and self.folder_id and self.folder_id != "YOUR_GOOGLE_DRIVE_FOLDER_ID":
+        if not GOOGLE_DRIVE_AVAILABLE:
+            self.use_fallback = True
+            logger.info("Running in local storage fallback. Files will be saved in assets/output/.")
+            return
+
+        token_path = os.path.join(BASE_DIR, "config", "token.json")
+        service_account_path = os.path.join(BASE_DIR, "config", "google_credentials.json")
+        scopes = ["https://www.googleapis.com/auth/drive"]
+        creds = None
+
+        # 1. Try loading OAuth2 user credentials (token.json)
+        if os.path.exists(token_path):
             try:
-                scopes = ["https://www.googleapis.com/auth/drive"]
-                creds = Credentials.from_service_account_file(self.creds_path, scopes=scopes)
+                from google.oauth2.credentials import Credentials
+                from google.auth.transport.requests import Request
+                creds = Credentials.from_authorized_user_file(token_path, scopes)
+                if creds and creds.expired and creds.refresh_token:
+                    logger.info("Refreshing expired Google Drive access token...")
+                    creds.refresh(Request())
+                    with open(token_path, "w") as token_file:
+                        token_file.write(creds.to_json())
+                logger.info("Loaded user credentials from token.json")
+            except Exception as e:
+                logger.error(f"Failed to load/refresh user credentials from token.json: {e}")
+                creds = None
+
+        # 2. Fallback to Service Account if OAuth2 failed or missing
+        if not creds and os.path.exists(service_account_path):
+            try:
+                from google.oauth2.service_account import Credentials as ServiceAccountCredentials
+                creds = ServiceAccountCredentials.from_service_account_file(service_account_path, scopes=scopes)
+                logger.info("Loaded service account credentials from google_credentials.json")
+            except Exception as e:
+                logger.error(f"Failed to load service account credentials: {e}")
+                creds = None
+
+        if creds:
+            try:
                 self.client = build("drive", "v3", credentials=creds)
                 self.use_fallback = False
                 logger.info("Successfully connected to Google Drive API.")
                 return
             except Exception as e:
-                logger.error(f"Google Drive connection failed: {e}. Using local storage only.")
-        
+                logger.error(f"Google Drive API connection failed: {e}")
+
         self.use_fallback = True
         logger.info("Running in local storage fallback. Files will be saved in assets/output/.")
 
@@ -62,9 +94,10 @@ class GDriveManager:
         try:
             # Build file metadata
             file_metadata = {
-                "name": file_name,
-                "parents": [self.folder_id]
+                "name": file_name
             }
+            if self.folder_id and self.folder_id != "YOUR_GOOGLE_DRIVE_FOLDER_ID":
+                file_metadata["parents"] = [self.folder_id]
             
             media = MediaFileUpload(local_path, mimetype=mime_type, resumable=True)
             file = self.client.files().create(
@@ -82,3 +115,4 @@ class GDriveManager:
             # Fallback to local path
             return local_path
 base_manager = GDriveManager()
+

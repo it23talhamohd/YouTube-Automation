@@ -43,7 +43,7 @@ logger = logging.getLogger("AutomationAgent.Main")
 
 # Load generator imports safely
 from src.script_gen import ScriptGenerator
-from src.uploader import YouTubeUploader
+from src.youtube_api import YouTubeApiUploader as YouTubeUploader
 
 class Orchestrator:
     def __init__(self):
