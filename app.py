@@ -4,6 +4,21 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime
 
+# Recreate Google credentials/token files dynamically in cloud environments
+try:
+    if "CREDENTIALS_JSON" in st.secrets:
+        os.makedirs("config", exist_ok=True)
+        if not os.path.exists("config/credentials.json"):
+            with open("config/credentials.json", "w", encoding="utf-8") as f:
+                f.write(st.secrets["CREDENTIALS_JSON"])
+    if "TOKEN_JSON" in st.secrets:
+        os.makedirs("config", exist_ok=True)
+        if not os.path.exists("config/token.json"):
+            with open("config/token.json", "w", encoding="utf-8") as f:
+                f.write(st.secrets["TOKEN_JSON"])
+except Exception:
+    pass
+
 # Set page config for mobile optimization
 st.set_page_config(
     page_title="AI Video Shorts Portal",
