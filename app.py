@@ -243,8 +243,12 @@ else:
                             video_file = local_path
                             temp_downloaded = False
                             
-                            # If not found locally (which is true in Streamlit Cloud), download from GDrive
-                            if not os.path.exists(video_file) and drive_link:
+                            # 1. Check if the drive_link column contains a local path that exists (on your PC)
+                            if not os.path.exists(video_file) and drive_link and os.path.exists(drive_link):
+                                video_file = drive_link
+                            
+                            # 2. If not found locally (which is true in Streamlit Cloud), download from GDrive
+                            if not os.path.exists(video_file) and drive_link and not os.path.exists(drive_link):
                                 import re
                                 # Extract file ID from Google Drive URL
                                 file_id = None
@@ -267,7 +271,7 @@ else:
                                     else:
                                         st.error("Could not download video from Google Drive.")
                                 else:
-                                    st.error("Invalid Google Drive video link format.")
+                                    st.error("Invalid Google Drive video link format. (If you are on Streamlit Cloud, older videos rendered before Google Drive setup cannot be accessed).")
                                     
                             if os.path.exists(video_file):
                                 description = f"{yt_title}\n\nAutomated Shorts daily update.\n\n#shorts #news #viral"
