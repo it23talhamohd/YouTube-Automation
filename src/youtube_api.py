@@ -23,18 +23,41 @@ class YouTubeApiUploader:
         self._initialize_youtube_client()
 
     def _initialize_youtube_client(self):
-        if not os.path.exists(self.token_path):
-            logger.error(f"token.json not found at {self.token_path}. Cannot initialize YouTube API.")
+        creds = None
+        
+        # 1. Try loading from environment variable
+        if "TOKEN_JSON" in os.environ and os.environ["TOKEN_JSON"].strip():
+            try:
+                import json
+                token_info = json.loads(os.environ["TOKEN_JSON"])
+                creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+                if creds and creds.expired and creds.refresh_token:
+                    logger.info("Refreshing expired YouTube API access token from env...")
+                    creds.refresh(Request())
+                logger.info("Loaded YouTube API user credentials from TOKEN_JSON environment variable")
+            except Exception as e:
+                logger.error(f"Failed to load/refresh user credentials from TOKEN_JSON env var: {e}")
+                creds = None
+
+        # 2. Try loading from file
+        if not creds and os.path.exists(self.token_path):
+            try:
+                creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
+                if creds and creds.expired and creds.refresh_token:
+                    logger.info("Refreshing expired YouTube API access token...")
+                    creds.refresh(Request())
+                    with open(self.token_path, "w") as token_file:
+                        token_file.write(creds.to_json())
+                logger.info("Loaded YouTube API user credentials from token.json")
+            except Exception as e:
+                logger.error(f"Failed to load/refresh user credentials from token.json: {e}")
+                creds = None
+
+        if not creds:
+            logger.error("No valid credentials found for YouTube API (neither in env nor token.json).")
             return
 
         try:
-            creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
-            if creds and creds.expired and creds.refresh_token:
-                logger.info("Refreshing expired YouTube API access token...")
-                creds.refresh(Request())
-                with open(self.token_path, "w") as token_file:
-                    token_file.write(creds.to_json())
-            
             self.client = build("youtube", "v3", credentials=creds)
             logger.info("Successfully connected to YouTube Data API.")
         except Exception as e:

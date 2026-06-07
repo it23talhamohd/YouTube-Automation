@@ -45,6 +45,8 @@ jobs:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+        CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
       run: |
         python main.py --run
 

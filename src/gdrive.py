@@ -31,8 +31,22 @@ class GDriveManager:
         scopes = ["https://www.googleapis.com/auth/drive"]
         creds = None
 
-        # 1. Try loading OAuth2 user credentials (token.json)
-        if os.path.exists(token_path):
+        # 1. Try loading OAuth2 user credentials (TOKEN_JSON env var or token.json file)
+        if "TOKEN_JSON" in os.environ and os.environ["TOKEN_JSON"].strip():
+            try:
+                import json
+                from google.oauth2.credentials import Credentials
+                from google.auth.transport.requests import Request
+                token_info = json.loads(os.environ["TOKEN_JSON"])
+                creds = Credentials.from_authorized_user_info(token_info, scopes)
+                if creds and creds.expired and creds.refresh_token:
+                    logger.info("Refreshing expired Google Drive access token from env...")
+                    creds.refresh(Request())
+                logger.info("Loaded user credentials from TOKEN_JSON environment variable")
+            except Exception as e:
+                logger.error(f"Failed to load/refresh user credentials from TOKEN_JSON env var: {e}")
+                creds = None
+        elif os.path.exists(token_path):
             try:
                 from google.oauth2.credentials import Credentials
                 from google.auth.transport.requests import Request
